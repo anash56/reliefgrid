@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: reliefgrid-postgres
+    environment:
+      POSTGRES_USER: relief
+      POSTGRES_PASSWORD: relief_pass
+      POSTGRES_DB: reliefgrid
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relief -d reliefgrid"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: reliefgrid-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
