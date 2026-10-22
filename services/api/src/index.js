@@ -6,24 +6,36 @@ const app = express();
 app.use(express.json());
 
 app.get('/health', async (req, res) => {
-  try {
-    await pool.query('SELECT 1');
-    const pong = await redis.ping();
-    res.json({ status: 'ok', postgres: 'up', redis: pong === 'PONG' ? 'up' : 'down' });
-  } catch (err) {
-    res.status(503).json({ status: 'error', message: err.message });
-  }
+  const check = async (fn) => {
+    try {
+      await fn();
+      return 'up';
+    } catch {
+      return 'down';
+    }
+  };
+
+  const postgres = await check(() => pool.query('SELECT 1'));
+  const redisStatus = await check(async () => {
+    if ((await redis.ping()) !== 'PONG') throw new Error('bad ping');
+  });
+
+  const healthy = postgres === 'up' && redisStatus === 'up';
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? 'ok' : 'degraded',
+    postgres,
+    redis: redisStatus,
+  });
 });
 
 const server = app.listen(config.port, () => {
   console.log(`API running on port ${config.port}`);
 });
 
-// Graceful shutdown: finish current requests, close connections, then exit
 const shutdown = async (signal) => {
   console.log(`${signal} received, shutting down`);
   server.close();
-  await Promise.all([pool.end(), redis.quit()]);
+  await Promise.allSettled([pool.end(), redis.quit()]);
   process.exit(0);
 };
 
