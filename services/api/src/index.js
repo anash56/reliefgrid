@@ -1,39 +1,22 @@
-import express from 'express';
+import { app } from './app.js';
 import { config } from './config.js';
+import { logger } from './logger.js';
 import { pool, redis } from './db.js';
 
-const app = express();
-app.use(express.json());
-
-app.get('/health', async (req, res) => {
-  const check = async (fn) => {
-    try {
-      await fn();
-      return 'up';
-    } catch {
-      return 'down';
-    }
-  };
-
-  const postgres = await check(() => pool.query('SELECT 1'));
-  const redisStatus = await check(async () => {
-    if ((await redis.ping()) !== 'PONG') throw new Error('bad ping');
-  });
-
-  const healthy = postgres === 'up' && redisStatus === 'up';
-  res.status(healthy ? 200 : 503).json({
-    status: healthy ? 'ok' : 'degraded',
-    postgres,
-    redis: redisStatus,
-  });
-});
-
 const server = app.listen(config.port, () => {
-  console.log(`API running on port ${config.port}`);
+  logger.info({ port: config.port, env: config.env }, 'API listening');
 });
+
+let shuttingDown = false;
 
 const shutdown = async (signal) => {
-  console.log(`${signal} received, shutting down`);
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, 'shutting down');
+
+  // If something hangs, force exit after 10 seconds
+  setTimeout(() => process.exit(1), 10_000).unref();
+
   server.close();
   await Promise.allSettled([pool.end(), redis.quit()]);
   process.exit(0);
@@ -41,3 +24,12 @@ const shutdown = async (signal) => {
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
+
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'unhandled promise rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'uncaught exception, exiting');
+  process.exit(1);
+});
