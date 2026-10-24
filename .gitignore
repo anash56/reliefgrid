@@ -1,2 +1,4 @@
 node_modules
 .env
+/services/api/scripts
+/services/api/body-*.json

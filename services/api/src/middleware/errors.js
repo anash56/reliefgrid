@@ -1,8 +1,9 @@
 export class AppError extends Error {
-  constructor(statusCode, code, message) {
+  constructor(statusCode, code, message, details) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -31,5 +32,10 @@ export const errorHandler = (err, req, res, _next) => {
     message = 'Internal server error';
   }
 
-  res.status(status).json({ error: { code, message, requestId: req.id } });
+  const body = { code, message, requestId: req.id };
+  if (err instanceof AppError && err.details && status < 500) {
+    body.details = err.details;
+  }
+
+  res.status(status).json({ error: body });
 };
