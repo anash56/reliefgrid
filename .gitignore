@@ -2,3 +2,4 @@ node_modules
 .env
 /services/api/scripts
 /services/api/body-*.json
+services/api/src/tests/
