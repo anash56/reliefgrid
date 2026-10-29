@@ -1,7 +1,7 @@
 import { app } from './app.js';
 import { config } from './config.js';
 import { logger } from './logger.js';
-import { pool, redis } from './db.js';
+import { prisma, redis } from './db.js';
 
 const server = app.listen(config.port, () => {
   logger.info({ port: config.port, env: config.env }, 'API listening');
@@ -18,7 +18,7 @@ const shutdown = async (signal) => {
   setTimeout(() => process.exit(1), 10_000).unref();
 
   server.close();
-  await Promise.allSettled([pool.end(), redis.quit()]);
+  await Promise.allSettled([prisma.$disconnect(), redis.quit()]);
   process.exit(0);
 };
 

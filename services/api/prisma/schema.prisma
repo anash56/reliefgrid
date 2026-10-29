@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  citizen
+  volunteer
+  coordinator
+  admin
+
+  @@map("role")
+}
+
+enum RequestType {
+  rescue
+  medical
+  food
+  water
+  shelter
+  transport
+  other
+
+  @@map("request_type")
+}
+
+enum RequestStatus {
+  open
+  offered
+  accepted
+  in_progress
+  resolved
+  escalated
+  cancelled
+
+  @@map("request_status")
+}
+
+model User {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String   @unique
+  password_hash String
+  role          Role
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  requests       HelpRequest[]
+  volunteer      Volunteer?
+  refresh_tokens RefreshToken[]
+
+  @@map("users")
+}
+
+model HelpRequest {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  owner_id       String?       @db.Uuid
+  type           RequestType
+  description    String
+  lat            Float
+  lng            Float
+  urgency        Int           @db.SmallInt
+  priority_score Int           @default(0)
+  status         RequestStatus @default(open)
+  report_count   Int           @default(1)
+  contact        String?
+  created_at     DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
+
+  owner   User?            @relation(fields: [owner_id], references: [id])
+  history RequestHistory[]
+
+  @@index([status, created_at(sort: Desc)])
+  @@map("requests")
+}
+
+model RequestHistory {
+  id          BigInt         @id @default(autoincrement())
+  request_id  String         @db.Uuid
+  from_status RequestStatus?
+  to_status   RequestStatus
+  actor       String
+  created_at  DateTime       @default(now()) @db.Timestamptz(6)
+
+  request HelpRequest @relation(fields: [request_id], references: [id], onDelete: Cascade)
+
+  @@index([request_id, created_at])
+  @@map("request_history")
+}
+
+model Volunteer {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String?       @unique @db.Uuid
+  name         String
+  phone        String?
+  skills       RequestType[] @default([])
+  lat          Float
+  lng          Float
+  is_available Boolean       @default(false)
+  last_seen_at DateTime      @default(now()) @db.Timestamptz(6)
+  created_at   DateTime      @default(now()) @db.Timestamptz(6)
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([is_available])
+  @@map("volunteers")
+}
+
+model RefreshToken {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  token_hash String    @unique
+  expires_at DateTime  @db.Timestamptz(6)
+  revoked_at DateTime? @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("refresh_tokens")
+}

@@ -1,16 +1,15 @@
-import pg from 'pg';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { Redis } from 'ioredis';
 import { config } from './config.js';
 import { logger } from './logger.js';
 
-export const pool = new pg.Pool({
+const adapter = new PrismaPg({
   connectionString: config.databaseUrl,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 2000, // fail fast when Postgres is down
 });
 
-pool.on('error', (err) => {
-  logger.error({ err }, 'unexpected postgres pool error');
-});
+export const prisma = new PrismaClient({ adapter });
 
 export const redis = new Redis(config.redisUrl, {
   enableOfflineQueue: false,

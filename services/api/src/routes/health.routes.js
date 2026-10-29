@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pool, redis } from '../db.js';
+import { prisma, redis } from '../db.js';
 
 export const healthRouter = Router();
 
@@ -20,7 +20,7 @@ healthRouter.get('/live', (_req, res) => {
 // Readiness: "can I actually serve traffic?" Checks Postgres and Redis.
 const ready = async (_req, res) => {
   const [postgres, redisStatus] = await Promise.all([
-    check(() => pool.query('SELECT 1')),
+    check(() => prisma.$queryRaw`SELECT 1`),
     check(async () => {
       if ((await redis.ping()) !== 'PONG') throw new Error('bad ping');
     }),
